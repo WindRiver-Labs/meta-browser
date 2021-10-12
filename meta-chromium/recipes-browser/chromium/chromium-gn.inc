@@ -9,20 +9,23 @@ OUTPUT_DIR = "out/Release"
 B = "${S}/${OUTPUT_DIR}"
 
 SRC_URI += " \
-    file://limit-number-of-LTO-jobs.patch \
-    file://0001-Remove-the-GN-settings-done-for-clang-that-conflict-.patch \
-    file://0002-v8-qemu-wrapper.patch \
-    file://0003-wrapper-extra-flags.patch \
-    file://0004-BUILD-do-not-specify-march-on-arm.patch \
-    file://0005-Consider-armv7ve-define.patch \
-    file://0006-Delete-compiler-options-not-available-in-release-ver.patch \
-    file://0010-avoid-link-latomic-failure-on-CentOS-8-host.patch \
-    file://0012-Fix-font-rendering-with-glibc-2.33.patch \
-    file://0001-nomerge-attribute-on-declaration-is-only-available-s.patch \
-    file://0001-Fixed-build-with-use_ozone-false.patch \
+    file://0001-limit-number-of-LTO-jobs.patch \
+    file://0002-Remove-the-GN-settings-done-for-clang-that-conflict-.patch \
+    file://0003-v8-qemu-wrapper.patch \
+    file://0004-wrapper-extra-flags.patch \
+    file://0005-BUILD-do-not-specify-march-on-arm.patch \
+    file://0006-Consider-armv7ve-define.patch \
+    file://0007-Delete-compiler-options-not-available-in-release-ver.patch \
+    file://0008-avoid-link-latomic-failure-on-CentOS-8-host.patch \
+    file://0009-nomerge-attribute-on-declaration-is-only-available-s.patch \
+    file://0010-fix-ruy-numeric-limits-error.patch \
+    file://0011-exception_handler.cc-Match-the-types-for-SIGSTKSZ.patch \
+    file://0013-Revert-Use-ffile-compilation-dir-instead-of-fdebug-c.patch \
+    file://0014-ozone-wayland-don-t-build-xcb-for-pure-wayland-build.patch \
+    file://0015-build-use-python3.patch \
 "
 
-SRC_URI_append_libc-musl = "\
+SRC_URI:append:libc-musl = "\
     file://musl/0001-mallinfo-implementation-is-glibc-specific.patch \
     file://musl/0002-execinfo-implementation-is-glibc-specific.patch \
     file://musl/0003-Define-TEMP_FAILURE_RETRY-and-__si_fields.patch \
@@ -43,6 +46,10 @@ SRC_URI_append_libc-musl = "\
     file://musl/0018--Use-monotonic-clock-for-pthread_cond_timedwait-with-.patch \
     file://musl/0019-adjust-thread-stack-sizes.patch \
     file://musl/0020-Fix-tab-crashes-on-musl.patch \
+    file://musl/0021-pthread_getname_np.patch \
+    file://musl/0022-sys-stat.patch \
+    file://musl/scoped-file.patch \
+    file://musl/fix-narrowing-cast.patch \
 "
 
 ANY_OF_DISTRO_FEATURES = "opengl vulkan"
@@ -56,10 +63,8 @@ DEPENDS += " \
     bison-native \
     cairo \
     curl \
-    dbus \
     expat \
     flac \
-    freetype \
     glib-2.0 \
     gn-native \
     gperf-native \
@@ -81,25 +86,26 @@ DEPENDS += " \
     qemu-native \
     virtual/libgl \
 "
+DEPEND:append:runtime-llvm = " compiler-rt-native libcxx-native"
 
 # The wrapper script we use from upstream requires bash.
-RDEPENDS_${PN} = "bash"
+RDEPENDS:${PN} = "bash"
 
 COMPATIBLE_MACHINE = "(-)"
-COMPATIBLE_MACHINE_aarch64 = "(.*)"
-COMPATIBLE_MACHINE_armv6 = "(.*)"
-COMPATIBLE_MACHINE_armv7a = "(.*)"
-COMPATIBLE_MACHINE_armv7ve = "(.*)"
-COMPATIBLE_MACHINE_x86 = "(.*)"
-COMPATIBLE_MACHINE_x86-64 = "(.*)"
+COMPATIBLE_MACHINE:aarch64 = "(.*)"
+COMPATIBLE_MACHINE:armv6 = "(.*)"
+COMPATIBLE_MACHINE:armv7a = "(.*)"
+COMPATIBLE_MACHINE:armv7ve = "(.*)"
+COMPATIBLE_MACHINE:x86 = "(.*)"
+COMPATIBLE_MACHINE:x86-64 = "(.*)"
 
 # Also build the parts that are run on the host with clang.
-BUILD_AR_toolchain-clang = "llvm-ar"
-BUILD_CC_toolchain-clang = "clang"
-BUILD_CXX_toolchain-clang = "clang++"
-BUILD_LD_toolchain-clang = "clang"
+BUILD_AR:toolchain-clang = "llvm-ar"
+BUILD_CC:toolchain-clang = "clang"
+BUILD_CXX:toolchain-clang = "clang++"
+BUILD_LD:toolchain-clang = "clang"
 
-PACKAGECONFIG ??= "use-egl"
+PACKAGECONFIG ??= "upower use-egl"
 
 # this makes sure the dependencies for the EGL mode are present; otherwise, the configure scripts
 # automatically and silently fall back to GLX
@@ -116,6 +122,9 @@ PACKAGECONFIG[proprietary-codecs] = ' \
         ffmpeg_branding="Chrome" proprietary_codecs=true, \
         ffmpeg_branding="Chromium" proprietary_codecs=false \
 '
+# Enable UPower by default.
+# Chromium expects to be able to query battery status through D-Bus.
+PACKAGECONFIG[upower] = ",,,upower"
 
 # Disable VA-API by default. It is compile time enabled since M88, but it's not
 # desired to make all the users of the Chromium meta-browser recipe depend on
@@ -131,9 +140,12 @@ GN_ARGS = " \
         use_gnome_keyring=false \
         use_kerberos=false \
         use_pulseaudio=${@bb.utils.contains('DISTRO_FEATURES', 'pulseaudio', 'true', 'false', d)} \
-        use_system_freetype=true \
         use_system_libjpeg=true \
 "
+# Not enabled by default, because the freetype version from oe-core
+# often isn't compatible, e.g. freetype-2.11 isn't compatible with
+# chromium-94
+GN_ARGS += "use_system_freetype=false"
 
 # Closure_compile needs to be disabled to avoid pulling in java dependencies,
 # which are typicaly not wanted. It started to happen after https://crrev.com/c/1278470
@@ -176,25 +188,25 @@ GN_ARGS += "use_lld=true use_gold=false"
 #    instead, so that if DEBUG_BUILD is not set GN will not create a huge debug
 #    binary anyway. Since our compiler flags are passed after GN's, -g0 does
 #    not cause any issues if DEBUG_BUILD is set, as -g1 will be passed later.
-DEBUG_FLAGS_remove_arm = "-g"
-DEBUG_FLAGS_append_arm = "-g1"
-DEBUG_FLAGS_remove_x86 = "-g"
-DEBUG_FLAGS_append_x86 = "-g1"
+DEBUG_FLAGS:remove:arm = "-g"
+DEBUG_FLAGS:append:arm = "-g1"
+DEBUG_FLAGS:remove:x86 = "-g"
+DEBUG_FLAGS:append:x86 = "-g1"
 GN_ARGS += "symbol_level=0"
 
 # As of Chromium 62.0.3202.94 and Yocto Rocko (GCC 7, binutils 2.29), passing
 # -g to the compiler results in many linker errors on aarch64, such as:
 # obj/third_party/WebKit/Source/modules/payments/libpayments.a(PaymentEventDataConversion.o)(.debug_loc+0x4e25): error: relocation overflow in R_AARCH64_ABS32
-DEBUG_FLAGS_remove_aarch64 = "-g"
-DEBUG_FLAGS_append_aarch64 = "-g1"
+DEBUG_FLAGS:remove:aarch64 = "-g"
+DEBUG_FLAGS:append:aarch64 = "-g1"
 
 # As of Chromium 60.0.3112.101 and Yocto Pyro (GCC 6, binutils 2.28), passing
 # -g to the compiler results in many linker errors on x86_64, such as:
 # obj/third_party/WebKit/Source/core/loader/libloader.a(ModuleTreeLinker.o)(.debug_loc+0x1e9a5): error: relocation overflow: reference to local symbol 82 in obj/third_party/WebKit/Source/core/loader/libloader.a(ModuleTreeLinker.o)
 # obj/third_party/WebKit/Source/core/libcore_generated.a(ScriptModule.o)(.debug_loc+0x253c): error: relocation overflow: reference to local symbol 31 in obj/third_party/WebKit/Source/core/libcore_generated.a(ScriptModule.o)
 # so we have to use the same hack described above.
-DEBUG_FLAGS_remove_x86-64 = "-g"
-DEBUG_FLAGS_append_x86-64 = "-g1"
+DEBUG_FLAGS:remove:x86-64 = "-g"
+DEBUG_FLAGS:append:x86-64 = "-g1"
 
 # Disable Chrome Remote Desktop (aka Chromoting) support. Building host support
 # (so that the machine running this recipe can be controlled remotely from
@@ -226,7 +238,7 @@ GN_ARGS += "is_cfi=false"
 # Disable activation of field trial tests that can cause problems in
 # production.
 # See https://groups.google.com/a/chromium.org/d/msg/chromium-packagers/ECWC57W7E0k/9Kc5UAmyDAAJ
-GN_ARGS += "fieldtrial_testing_like_official_build=true"
+GN_ARGS += "disable_fieldtrial_testing_config=true"
 
 # Disable PGO optimization as generated profdata requires the same version of
 # clang that upstream uses. Otherwise, clang-llvm produces the following error:
@@ -249,6 +261,11 @@ GN_ARGS += ' \
         google_default_client_secret="${GOOGLE_DEFAULT_CLIENT_SECRET}" \
 '
 
+# Use libcxx headers for native parts
+BUILD_CPPFLAGS:append:runtime-llvm = " -isysroot=${STAGING_DIR_NATIVE} -stdlib=libc++"
+# Use libgcc for native parts
+BUILD_LDFLAGS:append:runtime-llvm = " -rtlib=libgcc -unwindlib=libgcc -stdlib=libc++ -lc++abi -rpath ${STAGING_LIBDIR_NATIVE}"
+
 # Toolchains we will use for the build. We need to point to the toolchain file
 # we've created, set the right target architecture and make sure we are not
 # using Chromium's toolchain (bundled clang, bundled binutils etc).
@@ -259,16 +276,19 @@ GN_ARGS += ' \
         is_clang=true \
         clang_base_path="${@clang_install_path(d)}" \
         clang_use_chrome_plugins=false \
-        linux_use_bundled_binutils=false \
         target_cpu="${@gn_target_arch_name(d)}" \
         v8_snapshot_toolchain="//build/toolchain/yocto:yocto_target" \
 '
+
+# This parameter is added by limit-number-of-LTO-jobs.patch with the default value of 8,
+# but we can use whatever user configured in PARALLEL_MAKE
+GN_ARGS += 'max_jobs_per_link="${@oe.utils.parallel_make_argument(d, '%d')}"'
 
 # ARM builds need special additional flags (see ${S}/build/config/arm.gni).
 # If we do not pass |arm_arch| and friends to GN, it will deduce a value that
 # will then conflict with TUNE_CCARGS and CC.
 # Note that as of M61 in some corner cases parts of the build system disable
-# the "compiler_arm_fpu" GN config, whereas -mfpu is always passed via ${CC}.
+# the "compiler:arm_fpu" GN config, whereas -mfpu is always passed via ${CC}.
 # We might want to rework that if there are issues in the future.
 def get_compiler_flag(params, param_name, d):
     """Given a sequence of compiler arguments in |params|, returns the value of
@@ -281,17 +301,17 @@ def get_compiler_flag(params, param_name, d):
 ARM_FLOAT_ABI = "${@bb.utils.contains('TUNE_FEATURES', 'callconvention-hard', 'hard', 'softfp', d)}"
 ARM_FPU = "${@get_compiler_flag(d.getVar('TUNE_CCARGS').split(), '-mfpu', d)}"
 ARM_TUNE = "${@get_compiler_flag(d.getVar('TUNE_CCARGS').split(), '-mcpu', d)}"
-ARM_VERSION_aarch64 = "8"
-ARM_VERSION_armv7a = "7"
-ARM_VERSION_armv7ve = "7"
-ARM_VERSION_armv6 = "6"
+ARM_VERSION:aarch64 = "8"
+ARM_VERSION:armv7a = "7"
+ARM_VERSION:armv7ve = "7"
+ARM_VERSION:armv6 = "6"
 
 # GN computes and defaults to it automatically where needed
 # forcing it from cmdline breaks build on places where it ends up
 # overriding what GN wants
-TUNE_CCARGS_remove = "-mthumb"
+TUNE_CCARGS:remove = "-mthumb"
 
-GN_ARGS_append_arm = ' \
+GN_ARGS:append:arm = ' \
         arm_float_abi="${ARM_FLOAT_ABI}" \
         arm_fpu="${ARM_FPU}" \
         arm_tune="${ARM_TUNE}" \
@@ -299,15 +319,15 @@ GN_ARGS_append_arm = ' \
 '
 # tcmalloc's atomicops-internals-arm-v6plus.h uses the "dmb" instruction that
 # is not available on (some?) ARMv6 models, which causes the build to fail.
-GN_ARGS_append_armv6 += 'use_allocator="none"'
+GN_ARGS:append:armv6 += 'use_allocator="none"'
 # The WebRTC code fails to build on ARMv6 when NEON is enabled.
 # https://bugs.chromium.org/p/webrtc/issues/detail?id=6574
-GN_ARGS_append_armv6 += 'arm_use_neon=false'
+GN_ARGS:append:armv6 += 'arm_use_neon=false'
 
 # Disable glibc shims on musl
 # tcmalloc does not play well with musl as of M62 (and possibly earlier).
 # https://github.com/gperftools/gperftools/issues/693
-GN_ARGS_append_libc-musl = ' use_allocator_shim=false'
+GN_ARGS:append:libc-musl = ' use_allocator_shim=false use_allocator="none"'
 
 CHROMIUM_EXTRA_ARGS ?= " \
         ${@bb.utils.contains('PACKAGECONFIG', 'use-egl', '--use-gl=egl', '', d)} \
@@ -367,12 +387,12 @@ addtask add_nodejs_symlink after do_configure before do_compile
 
 do_configure() {
 	cd ${S}
-	./build/linux/unbundle/replace_gn_files.py --system-libraries ${GN_UNBUNDLE_LIBS}
+	python3 ./build/linux/unbundle/replace_gn_files.py --system-libraries ${GN_UNBUNDLE_LIBS}
 	gn gen --args='${GN_ARGS}' "${OUTPUT_DIR}"
 }
 
 do_compile() {
-	ninja -v ${PARALLEL_MAKE} chrome chrome_sandbox chromedriver
+	ninja -v ${PARALLEL_MAKE} chrome chrome_sandbox chromedriver.unstripped
 }
 do_compile[progress] = "outof:^\[(\d+)/(\d+)\]\s+"
 
@@ -457,14 +477,17 @@ do_install() {
 	fi
 
 	# ChromeDriver.
-	install -m 0755 chromedriver ${D}${bindir}/chromedriver
+	install -m 0755 chromedriver.unstripped ${D}${bindir}/chromedriver
+
+	# Install chrome_crashpad_handler.
+	install -m 0755 chrome_crashpad_handler ${D}${libdir}/chromium/
 }
 
 PACKAGES =+ "${PN}-chromedriver"
 
-FILES_${PN}-chromedriver = "${bindir}/chromedriver"
+FILES:${PN}-chromedriver = "${bindir}/chromedriver"
 
-FILES_${PN} = " \
+FILES:${PN} = " \
         ${bindir}/chromium \
         ${datadir}/applications/chromium.desktop \
         ${datadir}/icons/hicolor/*x*/apps/chromium.png \
@@ -474,4 +497,4 @@ FILES_${PN} = " \
 PACKAGE_DEBUG_SPLIT_STYLE = "debug-without-src"
 
 # There is no need to ship empty -dev packages.
-ALLOW_EMPTY_${PN}-dev = "0"
+ALLOW_EMPTY:${PN}-dev = "0"

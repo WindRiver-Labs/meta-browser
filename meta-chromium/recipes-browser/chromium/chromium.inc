@@ -4,8 +4,8 @@ HOMEPAGE = "https://www.chromium.org/Home"
 CVE_PRODUCT = "chromium:chromium google:chrome"
 
 SRC_URI = "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-${PV}.tar.xz"
-SRC_URI[md5sum] = "1cd7c81f58862fad6945f3bca18814d9"
-SRC_URI[sha256sum] = "84e56fa2ad96d910cab429c513eeaca7bfa94096fef057bd024be826ce8426bd"
+SRC_URI[md5sum] = "4b329a88fb91ed032972ad5ddd734200"
+SRC_URI[sha256sum] = "cabbba2e608c5ec110850b14ee5fead2608c44447a52edb80e2ba8261be3dc5b"
 
 S = "${WORKDIR}/chromium-${PV}"
 
@@ -14,9 +14,9 @@ S = "${WORKDIR}/chromium-${PV}"
 # guarantee that the generated code will work as expected.
 TOOLCHAIN = "clang"
 
-# By default, clang.bbclass sets TOOLCHAIN_class-native to "gcc", but we want
+# By default, clang.bbclass sets TOOLCHAIN:class-native to "gcc", but we want
 # to build the native recipes (e.g. GN) with clang too.
-TOOLCHAIN_class-native = "clang"
+TOOLCHAIN:class-native = "clang"
 
 # This makes the target build use libc++ and compiler_rt instead of the GNU
 # runtime, just like upstream does. The native binaries compiled and run as
@@ -24,8 +24,23 @@ TOOLCHAIN_class-native = "clang"
 # https://github.com/kraj/meta-clang/issues/449).
 RUNTIME = "llvm"
 
-inherit mime-xdg pythonnative
-DEPENDS += "python-setuptools-native"
+# meta-clang uses RUNTIME variable to add build dependencies on libcxx/compiler-rt
+# but does not add compiler options to commandline. It expects compiler's own
+# defaults to be used and compiler's buildtime defaults are chosen based on
+# global RUNTIME variable setting when building clang compiler, which defaults to 'gnu'.
+# For chromium libc++ is expected to be used therefore ensure that
+# right build flags are set for chromium irrespective of
+# distro defaults (which could be 'gnu' or 'llvm').
+# This also ensures that it does not rely too much on meta-clang's defaults.
+LIBCPLUSPLUS = "-stdlib=libc++"
+
+# Explicitly add dependency on libcxx, because meta-clang/hardknott checks for
+# --stdlib=libc++ in LIBCPLUSPLUS (with extra dash, which was removed in
+# newer meta-clang in https://github.com/kraj/meta-clang/commit/cda2283e4cf3c90ea42b43dbc3a2268be6655670)
+DEPENDS += "libcxx"
+
+inherit mime-xdg python3native
+DEPENDS += "python3-setuptools-native"
 
 # Chromium itself is licensed under the 3-clause BSD license. However, it
 # depends upon several other projects whose copyright files are listed in
@@ -146,6 +161,7 @@ LIC_FILES_CHKSUM = "\
     file://${S}/third_party/android_deps/libs/com_google_android_gms_play_services_vision/LICENSE;md5=92b728c587a67a1b9577e9ca141ca520 \
     file://${S}/third_party/android_deps/libs/com_google_android_gms_play_services_vision_common/LICENSE;md5=92b728c587a67a1b9577e9ca141ca520 \
     file://${S}/third_party/android_deps/libs/com_google_android_material_material/LICENSE;md5=7f7d74108ee1b7a743cca7d9a86784d6 \
+    file://${S}/third_party/android_deps/libs/com_google_android_play_core/LICENSE;md5=7f7d74108ee1b7a743cca7d9a86784d6 \
     file://${S}/third_party/android_deps/libs/com_google_code_findbugs_jsr305/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/android_deps/libs/com_google_dagger_dagger/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/android_deps/libs/com_google_errorprone_error_prone_annotations/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
@@ -166,8 +182,15 @@ LIC_FILES_CHKSUM = "\
     file://${S}/third_party/android_deps/libs/com_google_j2objc_j2objc_annotations/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/android_deps/libs/com_google_protobuf_protobuf_javalite/LICENSE;md5=37b5762e07f0af8c74ce80a8bda4266b \
     file://${S}/third_party/android_deps/libs/javax_inject_javax_inject/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
-    file://${S}/third_party/android_deps/libs/org_checkerframework_checker_compat_qual/LICENSE;md5=7f35d874eaad08606d5d622d4fe38c32 \
+    file://${S}/third_party/android_deps/libs/org_checkerframework_checker_compat_qual/LICENSE;md5=f32f668c1f4eea36fb53fc4cc7d96385 \
     file://${S}/third_party/android_deps/libs/org_codehaus_mojo_animal_sniffer_annotations/LICENSE;md5=a5dd953e661e22a77f7b8062ae790f6a \
+    file://${S}/third_party/android_deps/libs/org_jetbrains_annotations/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
+    file://${S}/third_party/android_deps/libs/org_jetbrains_kotlin_kotlin_stdlib/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
+    file://${S}/third_party/android_deps/libs/org_jetbrains_kotlin_kotlin_stdlib_common/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
+    file://${S}/third_party/android_deps/libs/org_jetbrains_kotlin_kotlin_stdlib_jdk7/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
+    file://${S}/third_party/android_deps/libs/org_jetbrains_kotlin_kotlin_stdlib_jdk8/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
+    file://${S}/third_party/android_deps/libs/org_jetbrains_kotlinx_kotlinx_coroutines_android/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
+    file://${S}/third_party/android_deps/libs/org_jetbrains_kotlinx_kotlinx_coroutines_core_jvm/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/android_media/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/android_opengl/LICENSE;md5=d10e92761a860d4113a7a525c78daf13 \
     file://${S}/third_party/android_provider/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
@@ -176,7 +199,6 @@ LIC_FILES_CHKSUM = "\
     file://${S}/third_party/angle/LICENSE;md5=7abdb66a6948f39c2f469140db5184e2 \
     file://${S}/third_party/angle/src/common/third_party/xxhash/LICENSE;md5=cb91c07001f1ca6fd50b6bd4f042946a \
     file://${S}/third_party/angle/src/libANGLE/renderer/vulkan/shaders/src/third_party/ffx_spd/LICENSE;md5=64356ee6f79c94525e102a3264a62653 \
-    file://${S}/third_party/angle/src/third_party/compiler/LICENSE;md5=0353c43961ee447c6432ea5c16485528 \
     file://${S}/third_party/apple_apsl/LICENSE;md5=c8c14a9f985552dba8d3edbd76660088 \
     file://${S}/third_party/arcore-android-sdk-client/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/arcore-android-sdk/LICENSE;md5=c1bc4f7fbdd7a5a3f2c0dfefd457665e \
@@ -199,6 +221,7 @@ LIC_FILES_CHKSUM = "\
     file://${S}/third_party/dawn/LICENSE;md5=302a09339e8de37ba06c121279be1707 \
     file://${S}/third_party/decklink/LICENSE;md5=85b197f7b7b1ef270b01a1b6377be50e \
     file://${S}/third_party/devtools-frontend/src/LICENSE;md5=537e0b52077bf0a616d0a0c8a79bc9d5 \
+    file://${S}/third_party/distributed_point_functions/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/dom_distiller_js/LICENSE;md5=1399a5b89c7ed8167d261770432511e8 \
     file://${S}/third_party/eigen3/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/emoji-metadata/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
@@ -206,10 +229,11 @@ LIC_FILES_CHKSUM = "\
     file://${S}/third_party/expat/src/expat/COPYING;md5=9e2ce3b3c4c0f2670883a23bbd7c37a9 \
     file://${S}/third_party/farmhash/LICENSE;md5=7dfaa79e2b070897e495fec386e3acfc \
     file://${S}/third_party/fdlibm/LICENSE;md5=b17367d6c97e638599071d99a3049dfe \
-    file://${S}/third_party/ffmpeg/CREDITS.chromium;md5=28c3eb351f68aa1d038e0e299dad5637 \
+    file://${S}/third_party/ffmpeg/CREDITS.chromium;md5=aa2247c58648fadacf4d7f865259eebe \
     file://${S}/third_party/fft2d/LICENSE;md5=a062f975da2ca26745be122d5a0b1356 \
     file://${S}/third_party/flac/COPYING.Xiph;md5=a2c4b71c0198682376d483eb5bcc9197 \
     file://${S}/third_party/flatbuffers/LICENSE;md5=a873c5645c184d51e0f9b34e1d7cf559 \
+    file://${S}/third_party/flex/LICENSE;md5=e4742cf92e89040b39486a6219b68067 \
     file://${S}/third_party/fontconfig/src/COPYING;md5=7a0449e9bc5370402a94c00204beca3d \
     file://${S}/third_party/fp16/LICENSE;md5=855dd24c28c76c916c5c2301b1958728 \
     file://${S}/third_party/freetype/src/docs/FTL.TXT;md5=9f37b4e6afa3fef9dba8932b16bd3f97 \
@@ -224,7 +248,7 @@ LIC_FILES_CHKSUM = "\
     file://${S}/third_party/grpc/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/gvr-android-keyboard/LICENSE;md5=67d07a07ec29a50a3ded12b2ba952257 \
     file://${S}/third_party/gvr-android-sdk/LICENSE;md5=50b9d1f02b2ee0d8a568ccf4d35216e2 \
-    file://${S}/third_party/harfbuzz-ng/src/COPYING;md5=8f787620b7d3866d9552fd1924c07572 \
+    file://${S}/third_party/harfbuzz-ng/src/COPYING;md5=6ee0f16281694fb6aa689cca1e0fb3da \
     file://${S}/third_party/highway/LICENSE;md5=2b42edef8fa55315f34f2370b4715ca9 \
     file://${S}/third_party/hunspell/COPYING.MPL;md5=bfe1f75d606912a4111c90743d6c7325 \
     file://${S}/third_party/hyphenation-patterns/LICENSE;md5=53b217e6f2560833cbb279119065ae61 \
@@ -247,8 +271,8 @@ LIC_FILES_CHKSUM = "\
     file://${S}/third_party/libgifcodec/LICENSE.md;md5=1018a09551825ebc78d78f84855e07fa \
     file://${S}/third_party/libipp/LICENSE;md5=af9e58383a1b2b17c75c6c9ff561ca9d \
     file://${S}/third_party/libjingle_xmpp/LICENSE;md5=ad296492125bc71530d06234d9bfebe0 \
-    file://${S}/third_party/libjpeg_turbo/LICENSE.md;md5=26d6491346496a57f75f00a78199122e \
-    file://${S}/third_party/libjxl/LICENSE;md5=b1e01b26bacfc2232046c90a330332b3 \
+    file://${S}/third_party/libjpeg_turbo/LICENSE.md;md5=970f17d51650fe54e4f839c6e6121f79 \
+    file://${S}/third_party/libjxl/LICENSE;md5=6a905a337cc228a1f68f0b5416f52a7f \
     file://${S}/third_party/liblouis/LICENSE;md5=8ab69863de0d3a0e00c4f97a4d78dd4a \
     file://${S}/third_party/libphonenumber/LICENSE;md5=e23fadd6ceef8c618fc1c65191d846fa \
     file://${S}/third_party/libpng/LICENSE;md5=b0085051bf265bac2bfc38bc89f50000 \
@@ -271,7 +295,9 @@ LIC_FILES_CHKSUM = "\
     file://${S}/third_party/logilab/logilab/common/LICENSE.txt;md5=751419260aa954499f7abaabaa882bbe \
     file://${S}/third_party/lottie/LICENSE;md5=827837648055a0bfb7782b91ab42eed1 \
     file://${S}/third_party/lzma_sdk/LICENSE;md5=a8d1f5a28cfd35e6dfea09b82672fae7 \
+    file://${S}/third_party/maldoca/src/LICENSE;md5=86d3f3a95c324c9479bd8986968f4327 \
     file://${S}/third_party/material_design_icons/LICENSE;md5=175792518e4ac015ab6696d16c4f607e \
+    file://${S}/third_party/material_web_components/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/mesa_headers/LICENSE;md5=072744090020e72ad7387e201873fe43 \
     file://${S}/third_party/metrics_proto/LICENSE;md5=0fca02217a5d49a14dfe2d11837bb34d \
     file://${S}/third_party/microsoft_webauthn/LICENSE;md5=b98fddd052bb2f5ddbcdbd417ffb26a8 \
@@ -321,7 +347,6 @@ LIC_FILES_CHKSUM = "\
     file://${S}/third_party/text-fragments-polyfill/LICENSE;md5=86d3f3a95c324c9479bd8986968f4327 \
     file://${S}/third_party/tflite-support/LICENSE;md5=e03a906d141508f60cbe30013b8d064b \
     file://${S}/third_party/tflite/LICENSE;md5=64a34301f8e355f57ec992c2af3e5157 \
-    file://${S}/third_party/tint/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/tlslite/LICENSE;md5=aab0efc53fd36d5832963dc71fd2316e \
     file://${S}/third_party/ukey2/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/unrar/src/license.txt;md5=fc9c335ec05a5f36764ef9ce7a79daa1 \
@@ -337,9 +362,9 @@ LIC_FILES_CHKSUM = "\
     file://${S}/third_party/vulkan-deps/vulkan-headers/LICENSE.txt;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/vulkan-deps/vulkan-loader/src/LICENSE.txt;md5=7dbefed23242760aa3475ee42801c5ac \
     file://${S}/third_party/vulkan-deps/vulkan-tools/src/LICENSE.txt;md5=3b83ef96387f14655fc854ddc3c6bd57 \
-    file://${S}/third_party/vulkan-deps/vulkan-validation-layers/src/LICENSE.txt;md5=7dbefed23242760aa3475ee42801c5ac \
-    file://${S}/third_party/vulkan_memory_allocator/LICENSE.txt;md5=bff949090c46187eb309d8a8b19b310c \
+    file://${S}/third_party/vulkan-deps/vulkan-validation-layers/src/LICENSE.txt;md5=8df9e8826734226d08cb412babfa599c \
     file://${S}/third_party/wayland-protocols/src/COPYING;md5=c7b12b6702da38ca028ace54aae3d484 \
+    file://${S}/third_party/vulkan_memory_allocator/LICENSE.txt;md5=28469cb09e41bc708efbb6a69fb39a29 \
     file://${S}/third_party/wayland/src/COPYING;md5=b31d8f53b6aaf2b4985d7dd7810a70d1 \
     file://${S}/third_party/web-animations-js/LICENSE;md5=3b83ef96387f14655fc854ddc3c6bd57 \
     file://${S}/third_party/webrtc/LICENSE;md5=ad296492125bc71530d06234d9bfebe0 \
@@ -351,7 +376,6 @@ LIC_FILES_CHKSUM = "\
     file://${S}/third_party/xdg-utils/LICENSE;md5=a5367a90934098d6b05af3b746405014 \
     file://${S}/third_party/zlib/LICENSE;md5=f09575dbfb09420642318b413159496f \
     file://${S}/third_party/zxcvbn-cpp/LICENSE.txt;md5=50f9303d0b3adb4952217b0d8c00d83f \
-    file://${S}/tools/grit/third_party/six/LICENSE;md5=6f00d4a50713fa859858dd9abaa35b21 \
     file://${S}/url/third_party/mozilla/LICENSE.txt;md5=437ced1e9b232651b0912a9594da43b2 \
     file://${S}/v8/LICENSE;md5=6611673a9587a522034a4be8f4df564c \
     file://${S}/v8/LICENSE.fdlibm;md5=b17367d6c97e638599071d99a3049dfe \

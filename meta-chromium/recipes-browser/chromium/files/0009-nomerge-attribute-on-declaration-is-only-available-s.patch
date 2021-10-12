@@ -1,10 +1,9 @@
-Upstream-Status: Inapproriate
+Upstream-status: Inapproriate
 
 Upstream suggests to use Chromium's hermetic clang
 instead.
 
 Signed-off-by: Maksim Sisov <msisov@igalia.com>
-Signed-off-by: Tony Tascioglu <tony.tascioglu@windriver.com>
 ---
 From bde3186ccba169391fb428fcc296b2236ada0010 Mon Sep 17 00:00:00 2001
 From: Maksim Sisov <msisov@igalia.com>
@@ -26,10 +25,10 @@ Change-Id: I32e1f7dc9049737d54d8a16de5308aa5aae1ced1
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/base/compiler_specific.h b/base/compiler_specific.h
-index 6693e9ea33e9..d3b425abe9ca 100644
+index d53387f3dbe3c..ba6f41001892e 100644
 --- a/base/compiler_specific.h
 +++ b/base/compiler_specific.h
-@@ -340,7 +340,8 @@ inline constexpr bool AnalyzerAssumeTrue(bool arg) {
+@@ -365,7 +365,8 @@ inline constexpr bool AnalyzerAssumeTrue(bool arg) {
  #endif  // defined(__clang_analyzer__)
  
  // Use nomerge attribute to disable optimization of merging multiple same calls.
@@ -39,6 +38,3 @@ index 6693e9ea33e9..d3b425abe9ca 100644
  #define NOMERGE [[clang::nomerge]]
  #else
  #define NOMERGE
--- 
-2.25.1
-
