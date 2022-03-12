@@ -58,7 +58,7 @@ S = "${WORKDIR}/firefox-${MOZ_APP_BASE_VERSION}"
 
 MOZ_APP_BASE_VERSION = "${@'${PV}'.replace('esr', '')}"
 
-inherit mozilla rust-common
+inherit mozilla rust-common-without-python3native
 
 TOOLCHAIN_pn-firefox = "clang"
 AS = "${CC}"
